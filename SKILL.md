@@ -14,12 +14,12 @@ description: >
 
 - `/token-optimizer` - 显示当前优化状态 + 建议
 - `/token-optimizer status` - 运行诊断脚本
-- `/token-optimizer compress [file]` - 压缩 CLAUDE.md（默认 ~/.claude/CLAUDE.md）
+- `/token-optimizer compress [file]` - 压缩 CLAUDE.md（默认 `<AGENT_HOME>/CLAUDE.md`）
 - 自然语言: "优化token"、"token太多"、"省token"
 
 ## 当前状态诊断
 
-执行 `bash ~/.claude/skills/token-optimizer/scripts/status.sh` 并汇报结果。检查项:
+执行 `bash <AGENT_HOME>/skills/token-optimizer/scripts/status.sh` 并汇报结果。检查项:
 - Caveman skill 安装状态
 - AutoContext hook 注册状态（UserPromptSubmit）
 - 增强版 PreCompact/SessionStart hooks
@@ -32,8 +32,8 @@ description: >
 ### 1. AutoContext - 上下文卫生自动检测
 
 **触发**: 每次用户提交 prompt（UserPromptSubmit hook）
-**脚本**: `~/.claude/plugins/installed/auto-context/scripts/context_sense.py`
-**机制**: 读取 transcript 行数和体积，超阈值时注入 `<auto-context>` 提示
+**脚本**: `<AGENT_HOME>/plugins/installed/auto-context/scripts/context_sense.py`
+**机制**: 基于 lovstudio:auto-context 规则读取消息数和 transcript 体积，超阈值时注入 `<auto-context>` 提示
 
 | 条件 | 行为 |
 |------|------|
@@ -46,12 +46,12 @@ description: >
 
 ### 2. 上下文交接 - 压缩前快照 + 压缩后恢复
 
-**PreCompact** (`~/.claude/scripts/hooks/pre-compact.js`):
+**PreCompact** (`<AGENT_HOME>/scripts/hooks/pre-compact.js`):
 - 提取最近 15 条去重用户消息（85% 相似度阈值）
 - 提取最近代码片段和活跃文件路径
-- 写入 `~/.claude/handoff/<session_id>.md`（<=2KB）
+- 写入 `<AGENT_HOME>/handoff/<session_id>.md`（<=2KB）
 
-**SessionStart** (`~/.claude/scripts/hooks/session-start.js`):
+**SessionStart** (`<AGENT_HOME>/scripts/hooks/session-start.js`):
 - 检测 source=compact/clear 时自动恢复快照
 - 验证 cwd 匹配 + 15 分钟时间窗口
 - 通过 stderr 注入恢复上下文
@@ -60,16 +60,16 @@ description: >
 ### 3. Strategic Compact 建议
 
 **触发**: 每次 Edit/Write 操作（PreToolUse hook）
-**脚本**: `~/.claude/scripts/hooks/suggest-compact.js`
-- 50 次工具调用后首次建议
-- 之后每 25 次提醒一次
+**脚本**: `<AGENT_HOME>/scripts/hooks/suggest-compact.js`
+- 10 次工具调用后首次建议
+- 之后每 10 次提醒一次
 
 ## 手动工具
 
 ### CLAUDE.md 压缩
 
 ```bash
-bash ~/.claude/skills/token-optimizer/scripts/compress-claudemd.sh <path>
+bash <AGENT_HOME>/skills/token-optimizer/scripts/compress-claudemd.sh <path>
 ```
 
 合并连续空行、移除行尾空白、压缩分隔线。保留代码块、URL、配置。生成 `.original.md` 备份。
@@ -95,7 +95,11 @@ bash ~/.claude/skills/token-optimizer/scripts/compress-claudemd.sh <path>
 | `HANDOFF_MAX_USER_MESSAGES` | 15 | 快照最大用户消息数 |
 | `HANDOFF_DEDUP_THRESHOLD` | 0.85 | 消息去重阈值 |
 | `HANDOFF_MAX_AGE_SEC` | 900 | 快照恢复时间窗口（秒） |
-| `COMPACT_THRESHOLD` | 50 | 建议 compact 的工具调用阈值 |
+| `AUTO_CONTEXT_MESSAGE_THRESHOLD` | 40 | AutoContext 普通提醒阈值（消息数） |
+| `AUTO_CONTEXT_TRANSCRIPT_BYTES_STRONG` | 153600 | AutoContext 强提醒阈值（bytes，默认 150KB） |
+| `AUTO_CONTEXT_COOLDOWN_MESSAGES` | 10 | AutoContext 提醒冷却（消息条数） |
+| `AGENT_HOME` | 自动识别 | Agent 工作目录（优先 `AGENT_HOME/CODEX_HOME/CLAUDE_DIR`，再探测 `~/.codex`，最后回退 `~/.claude`） |
+| `COMPACT_THRESHOLD` | 10 | 建议 compact 的工具调用阈值 |
 
 ## 上下文卫生最佳实践
 

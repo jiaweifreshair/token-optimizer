@@ -16,12 +16,29 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
+/**
+ * 解析 Agent 工作目录。
+ * 是什么: Claude/Codex 通用的目录定位器。
+ * 做什么: 优先读取环境变量，其次自动探测 ~/.codex，最后回退 ~/.claude。
+ * 为什么: 让同一套 hook 在 Claude Code 和 Codex 中都可直接复用。
+ */
+function resolveAgentHome() {
+    if (process.env.AGENT_HOME) return process.env.AGENT_HOME;
+    if (process.env.CODEX_HOME) return process.env.CODEX_HOME;
+    if (process.env.CLAUDE_DIR) return process.env.CLAUDE_DIR;
+
+    const codexDir = path.join(os.homedir(), '.codex');
+    if (fs.existsSync(codexDir)) return codexDir;
+    return path.join(os.homedir(), '.claude');
+}
+
 // 配置
+const AGENT_HOME = resolveAgentHome();
 const MAX_USER_MESSAGES = parseInt(process.env.HANDOFF_MAX_USER_MESSAGES || '15', 10);
 const MAX_ASSISTANT_CHARS = parseInt(process.env.HANDOFF_MAX_ASSISTANT_CHARS || '800', 10);
 const DEDUP_THRESHOLD = parseFloat(process.env.HANDOFF_DEDUP_THRESHOLD || '0.85');
-const HANDOFF_DIR = path.join(os.homedir(), '.claude', 'handoff');
-const SESSIONS_DIR = path.join(os.homedir(), '.claude', 'sessions');
+const HANDOFF_DIR = path.join(AGENT_HOME, 'handoff');
+const SESSIONS_DIR = path.join(AGENT_HOME, 'sessions');
 
 /** 确保目录存在 */
 function ensureDir(dir) {
@@ -110,7 +127,7 @@ async function main() {
 
     // 尝试读取 session transcript
     const transcriptPatterns = [
-        path.join(os.homedir(), '.claude', 'projects', '**', sessionId, 'transcript.jsonl'),
+        path.join(AGENT_HOME, 'projects', '**', sessionId, 'transcript.jsonl'),
     ];
 
     // 从 hookData 提取（如果有 messages 字段）

@@ -15,9 +15,26 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
+/**
+ * 解析 Agent 工作目录。
+ * 是什么: Claude/Codex 通用目录解析函数。
+ * 做什么: 按环境变量优先级与目录存在性自动定位工作目录。
+ * 为什么: 避免脚本硬编码 ~/.claude，提升跨运行时兼容性。
+ */
+function resolveAgentHome() {
+    if (process.env.AGENT_HOME) return process.env.AGENT_HOME;
+    if (process.env.CODEX_HOME) return process.env.CODEX_HOME;
+    if (process.env.CLAUDE_DIR) return process.env.CLAUDE_DIR;
+
+    const codexDir = path.join(os.homedir(), '.codex');
+    if (fs.existsSync(codexDir)) return codexDir;
+    return path.join(os.homedir(), '.claude');
+}
+
 // 配置
+const AGENT_HOME = resolveAgentHome();
 const MAX_AGE_SEC = parseInt(process.env.HANDOFF_MAX_AGE_SEC || '900', 10); // 15分钟
-const HANDOFF_DIR = path.join(os.homedir(), '.claude', 'handoff');
+const HANDOFF_DIR = path.join(AGENT_HOME, 'handoff');
 const CLEANUP_AGE_HOURS = 24;
 
 /** 确保目录存在 */
@@ -139,7 +156,7 @@ async function main() {
     }
 
     // 检查 learned skills
-    const learnedDir = path.join(os.homedir(), '.claude', 'learned-skills');
+    const learnedDir = path.join(AGENT_HOME, 'learned-skills');
     if (fs.existsSync(learnedDir)) {
         try {
             const skills = fs.readdirSync(learnedDir).filter(f => f.endsWith('.md'));

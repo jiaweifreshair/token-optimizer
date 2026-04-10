@@ -1,6 +1,6 @@
 # Token Optimizer
 
-Claude Code 三层 Token 优化系统。自动压缩输出、自动检测上下文污染、自动交接压缩快照 - 用户零感知。
+Claude Code / Codex 三层 Token 优化系统。自动压缩输出、自动检测上下文污染、自动交接压缩快照 - 用户零感知。
 
 ## 问题
 
@@ -23,15 +23,15 @@ Layer 3  Context Handoff 交接     PreCompact hook     压缩后零损失恢复
     |
     v
 [UserPromptSubmit hook] ─── AutoContext: context_sense.py
-    |                        读 transcript 行数/体积
+    |                        读 transcript 行数/体积（lovstudio 规则）
     |                        超阈值 -> 注入 <auto-context> 提示
-    |                        Claude 自判断: 继续 / /fork / /btw
+    |                        Agent 自判断: 继续 / /fork / /btw
     v
-Claude 执行任务
+Agent 执行任务
     |
     v
 [PreToolUse hook] ─── suggest-compact.js
-    |                  50次工具调用后建议 /compact
+    |                  10次工具调用后建议 /compact
     v
 [Edit/Write 完成]
     |
@@ -41,7 +41,7 @@ Claude 执行任务
     v
 [PreCompact hook] ─── enhanced-pre-compact.js
     |                   提取: 15条用户消息 + 代码片段 + 文件路径
-    |                   写入: ~/.claude/handoff/<session>.md (<=2KB)
+    |                   写入: <AGENT_HOME>/handoff/<session>.md (<=2KB)
     v
 [SessionStart hook] ─── enhanced-session-start.js
                          source=compact -> 恢复快照
@@ -52,31 +52,34 @@ Claude 执行任务
 ## 文件结构
 
 ```
-~/.claude/skills/token-optimizer/
+<AGENT_HOME>/skills/token-optimizer/
 ├── SKILL.md                           # Skill 定义（/token-optimizer 入口）
 ├── README.md                          # 本文件
 └── scripts/
     ├── install.sh                     # 一键安装脚本
     ├── status.sh                      # 状态诊断
     ├── compress-claudemd.sh           # CLAUDE.md 无损压缩
+    ├── context_sense.py               # AutoContext hook（lovstudio 规则迁移）
+    ├── auto-context-SKILL.md          # /auto-context skill 模板
     ├── enhanced-pre-compact.js        # PreCompact hook（上下文快照）
-    └── enhanced-session-start.js      # SessionStart hook（自动恢复）
+    ├── enhanced-session-start.js      # SessionStart hook（自动恢复）
+    └── suggest-compact.js             # PreToolUse hook（10次建议 /compact）
 
-~/.claude/plugins/installed/auto-context/
+<AGENT_HOME>/plugins/installed/auto-context/
 ├── .claude-plugin/plugin.json         # Plugin 清单
 ├── hooks/hooks.json                   # UserPromptSubmit hook 定义
-├── scripts/context_sense.py           # 上下文卫生检测脚本
+├── scripts/context_sense.py           # 上下文卫生检测脚本（lovstudio 规则迁移）
 └── skills/auto-context/SKILL.md       # /auto-context 手动触发
 
-~/.claude/skills/caveman/              # Caveman 输出压缩 skill
-~/.claude/skills/caveman-compress/     # CLAUDE.md 压缩 skill
-~/.claude/skills/auto-context/         # AutoContext 手动触发 skill
-~/.claude/handoff/                     # 上下文快照存储
+<AGENT_HOME>/skills/caveman/           # Caveman 输出压缩 skill
+<AGENT_HOME>/skills/caveman-compress/  # CLAUDE.md 压缩 skill
+<AGENT_HOME>/skills/auto-context/      # AutoContext 手动触发 skill
+<AGENT_HOME>/handoff/                  # 上下文快照存储
 ```
 
 ## Hooks 注册
 
-在 `~/.claude/settings.json` 中注册了以下 hooks：
+在 `<AGENT_HOME>/settings.json` 中注册了以下 hooks：
 
 | Hook 事件 | 脚本 | 功能 |
 |-----------|------|------|
@@ -88,6 +91,10 @@ Claude 执行任务
 ## 使用
 
 所有自动化组件无需手动操作，重启 session 后即生效。
+
+安装后会自动部署 Layer 2（AutoContext）到：
+- `<AGENT_HOME>/plugins/installed/auto-context/scripts/context_sense.py`
+- `<AGENT_HOME>/skills/auto-context/SKILL.md`
 
 手动命令：
 
@@ -107,7 +114,7 @@ Claude 执行任务
 /caveman-compress     # 压缩内存文件，-45% 每 session 加载
 
 # 压缩指定文件（去空行、去行尾空白）
-/token-optimizer compress ~/.claude/CLAUDE.md
+/token-optimizer compress <AGENT_HOME>/CLAUDE.md
 ```
 
 ## 环境变量
@@ -117,7 +124,11 @@ Claude 执行任务
 | `HANDOFF_MAX_USER_MESSAGES` | `15` | 快照中保留的最大用户消息数 |
 | `HANDOFF_DEDUP_THRESHOLD` | `0.85` | 消息去重相似度阈值 |
 | `HANDOFF_MAX_AGE_SEC` | `900` | 快照恢复最大时间窗口（秒） |
-| `COMPACT_THRESHOLD` | `50` | 建议 /compact 的工具调用阈值 |
+| `AUTO_CONTEXT_MESSAGE_THRESHOLD` | `40` | AutoContext 普通提醒阈值（消息数） |
+| `AUTO_CONTEXT_TRANSCRIPT_BYTES_STRONG` | `153600` | AutoContext 强提醒阈值（bytes，默认 150KB） |
+| `AUTO_CONTEXT_COOLDOWN_MESSAGES` | `10` | AutoContext 提醒冷却（消息条数） |
+| `AGENT_HOME` | 自动识别 | Agent 工作目录（优先 `AGENT_HOME/CODEX_HOME/CLAUDE_DIR`，再探测 `~/.codex`，最后回退 `~/.claude`） |
+| `COMPACT_THRESHOLD` | `10` | 建议 /compact 的工具调用阈值 |
 
 ## 设计理念
 
@@ -126,16 +137,17 @@ Claude 执行任务
 - **Plugin (Hook)** 负责自动触发 - 用户不需要记得什么时候该检查上下文
 - **Skill** 负责手动触发 - 用户主动检查时获得完整报告
 - **脚本做"笨"的量化检测** - 行数/体积/冷却
-- **Claude 做"聪明"的定性判断** - 信噪比/话题相关度
+- **Agent 做"聪明"的定性判断** - 信噪比/话题相关度
 
 三层决策框架 (Sense -> Decide -> Evolve)：
 1. **Sense** - 量化检测上下文负载（行数、体积、工具调用次数）
-2. **Decide** - Claude 自主判断：继续 / 压缩 / fork / 全新 session
+2. **Decide** - Agent 自主判断：继续 / 压缩 / fork / 全新 session
 3. **Evolve** - 项目配置（CLAUDE.md）随使用自动沉淀经验
 
 ## 致谢
 
 - [lovstudio/skills](https://github.com/lovstudio/skills) - AutoContext 原始实现
+- [lovstudio/claude-code-plugin](https://github.com/lovstudio/claude-code-plugin) - AutoContext 自动触发架构参考
 - [JuliusBrussee/caveman](https://github.com/JuliusBrussee/caveman) - Caveman 输出压缩
 - [who96/claude-code-context-handoff](https://github.com/who96/claude-code-context-handoff) - 上下文交接机制
 - [mksglu/context-mode](https://github.com/mksglu/context-mode) - 工具输出沙箱化思路
