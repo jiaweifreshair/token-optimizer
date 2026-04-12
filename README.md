@@ -79,7 +79,9 @@ Agent 执行任务
 
 ## Hooks 注册
 
-在 `<AGENT_HOME>/settings.json` 中注册了以下 hooks：
+要让 Token Optimizer 在 Claude 本地环境中自动生效，除了运行安装脚本，还需要在 `~/.claude/settings.json` 顶层注册 hooks。
+
+在 `<AGENT_HOME>/settings.json` 中注册以下 hooks：
 
 | Hook 事件 | 脚本 | 功能 |
 |-----------|------|------|
@@ -88,13 +90,82 @@ Agent 执行任务
 | `SessionStart` | `enhanced-session-start.js` | 压缩后恢复快照 |
 | `PreToolUse` (Edit/Write) | `suggest-compact.js` | 工具调用计数，建议 /compact |
 
+Claude 本地环境可直接使用下面的配置片段：
+
+```json
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/apus/.claude/plugins/installed/auto-context/scripts/context_sense.py"
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/apus/.claude/skills/token-optimizer/scripts/enhanced-pre-compact.js"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/apus/.claude/skills/token-optimizer/scripts/enhanced-session-start.js"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/apus/.claude/skills/token-optimizer/scripts/suggest-compact.js"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+说明：
+- `UserPromptSubmit` 使用的是安装后部署到 `~/.claude/plugins/installed/auto-context/scripts/context_sense.py` 的脚本
+- 其余 3 个 hook 使用的是 `~/.claude/skills/token-optimizer/scripts/` 下的脚本
+- `PreToolUse` 只建议匹配 `Edit|Write`，避免扩大触发范围
+
 ## 使用
 
-所有自动化组件无需手动操作，重启 session 后即生效。
+完成安装脚本和 `~/.claude/settings.json` hooks 配置后，重启或新开一个 Claude session，所有自动化组件才会自动生效。
 
 安装后会自动部署 Layer 2（AutoContext）到：
 - `<AGENT_HOME>/plugins/installed/auto-context/scripts/context_sense.py`
 - `<AGENT_HOME>/skills/auto-context/SKILL.md`
+
+建议先运行下面的命令确认配置完成：
+
+```bash
+bash ~/.claude/skills/token-optimizer/scripts/status.sh
+```
+
+若配置正确，至少应看到这些检查项为绿色：
+- `AutoContext hook 已注册`
+- `PreCompact hook 已配置`
+- `SessionStart hook 已配置`
+- `Strategic Compact 建议已配置`
+
+如果仍有红项，通常只应剩下 Caveman 未安装这一类与 hooks 配置无关的提示。
 
 手动命令：
 
