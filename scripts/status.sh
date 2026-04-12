@@ -53,8 +53,9 @@ resolve_agent_home_source() {
     fi
 }
 
-AGENT_HOME="$(resolve_agent_home)"
+RESOLVED_AGENT_HOME="$(resolve_agent_home)"
 resolve_agent_home_source
+AGENT_HOME="$RESOLVED_AGENT_HOME"
 HANDOFF_DIR="$AGENT_HOME/handoff"
 HOOKS_DIR="$AGENT_HOME/scripts/hooks"
 
