@@ -98,7 +98,7 @@ bash <AGENT_HOME>/skills/token-optimizer/scripts/compress-claudemd.sh <path>
 | `AUTO_CONTEXT_MESSAGE_THRESHOLD` | 40 | AutoContext 普通提醒阈值（消息数） |
 | `AUTO_CONTEXT_TRANSCRIPT_BYTES_STRONG` | 153600 | AutoContext 强提醒阈值（bytes，默认 150KB） |
 | `AUTO_CONTEXT_COOLDOWN_MESSAGES` | 10 | AutoContext 提醒冷却（消息条数） |
-| `AGENT_HOME` | 自动识别 | Agent 工作目录（优先 `AGENT_HOME/CODEX_HOME/CLAUDE_DIR`，再探测 `~/.codex`，最后回退 `~/.claude`） |
+| `AGENT_HOME` | 自动识别 | Agent 工作目录（优先 `AGENT_HOME/CLAUDE_DIR/CODEX_HOME`，再按 `CLAUDE_SESSION_ID/CODEX_SESSION_ID` 判断运行时，最后保守回退 `~/.claude`） |
 | `COMPACT_THRESHOLD` | 10 | 建议 compact 的工具调用阈值 |
 
 ## 上下文卫生最佳实践

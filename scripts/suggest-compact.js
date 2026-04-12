@@ -17,16 +17,15 @@ const os = require('os');
 /**
  * 解析 Agent 工作目录。
  * 是什么: 多运行时统一目录定位函数。
- * 做什么: 依次读取 AGENT_HOME/CODEX_HOME/CLAUDE_DIR，若未配置则自动探测 ~/.codex 或回退 ~/.claude。
- * 为什么: 同一脚本可在 Claude 与 Codex 环境复用，减少维护分叉。
+ * 做什么: 优先读取显式目录变量，再按当前运行时的 session 环境变量选择 ~/.claude 或 ~/.codex，无法判断时保守回退 ~/.claude。
+ * 为什么: 避免仅因 ~/.codex 存在就误判到 Codex，同时保留双运行时兼容。
  */
 function resolveAgentHome() {
     if (process.env.AGENT_HOME) return process.env.AGENT_HOME;
-    if (process.env.CODEX_HOME) return process.env.CODEX_HOME;
     if (process.env.CLAUDE_DIR) return process.env.CLAUDE_DIR;
-
-    const codexDir = path.join(os.homedir(), '.codex');
-    if (fs.existsSync(codexDir)) return codexDir;
+    if (process.env.CODEX_HOME) return process.env.CODEX_HOME;
+    if (process.env.CLAUDE_SESSION_ID) return path.join(os.homedir(), '.claude');
+    if (process.env.CODEX_SESSION_ID) return path.join(os.homedir(), '.codex');
     return path.join(os.homedir(), '.claude');
 }
 

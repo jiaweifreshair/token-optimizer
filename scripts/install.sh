@@ -13,15 +13,19 @@ resolve_agent_home() {
         echo "${AGENT_HOME}"
         return
     fi
-    if [ -n "${CODEX_HOME:-}" ]; then
-        echo "${CODEX_HOME}"
-        return
-    fi
     if [ -n "${CLAUDE_DIR:-}" ]; then
         echo "${CLAUDE_DIR}"
         return
     fi
-    if [ -d "$HOME/.codex" ]; then
+    if [ -n "${CODEX_HOME:-}" ]; then
+        echo "${CODEX_HOME}"
+        return
+    fi
+    if [ -n "${CLAUDE_SESSION_ID:-}" ]; then
+        echo "$HOME/.claude"
+        return
+    fi
+    if [ -n "${CODEX_SESSION_ID:-}" ]; then
         echo "$HOME/.codex"
         return
     fi

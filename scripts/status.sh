@@ -10,22 +10,51 @@ resolve_agent_home() {
         echo "${AGENT_HOME}"
         return
     fi
-    if [ -n "${CODEX_HOME:-}" ]; then
-        echo "${CODEX_HOME}"
-        return
-    fi
     if [ -n "${CLAUDE_DIR:-}" ]; then
         echo "${CLAUDE_DIR}"
         return
     fi
-    if [ -d "$HOME/.codex" ]; then
+    if [ -n "${CODEX_HOME:-}" ]; then
+        echo "${CODEX_HOME}"
+        return
+    fi
+    if [ -n "${CLAUDE_SESSION_ID:-}" ]; then
+        echo "$HOME/.claude"
+        return
+    fi
+    if [ -n "${CODEX_SESSION_ID:-}" ]; then
         echo "$HOME/.codex"
         return
     fi
     echo "$HOME/.claude"
 }
 
+RESOLVED_AGENT_HOME_SOURCE="fallback ~/.claude"
+resolve_agent_home_source() {
+    if [ -n "${AGENT_HOME:-}" ]; then
+        RESOLVED_AGENT_HOME_SOURCE="AGENT_HOME"
+        return
+    fi
+    if [ -n "${CLAUDE_DIR:-}" ]; then
+        RESOLVED_AGENT_HOME_SOURCE="CLAUDE_DIR"
+        return
+    fi
+    if [ -n "${CODEX_HOME:-}" ]; then
+        RESOLVED_AGENT_HOME_SOURCE="CODEX_HOME"
+        return
+    fi
+    if [ -n "${CLAUDE_SESSION_ID:-}" ]; then
+        RESOLVED_AGENT_HOME_SOURCE="CLAUDE_SESSION_ID"
+        return
+    fi
+    if [ -n "${CODEX_SESSION_ID:-}" ]; then
+        RESOLVED_AGENT_HOME_SOURCE="CODEX_SESSION_ID"
+        return
+    fi
+}
+
 AGENT_HOME="$(resolve_agent_home)"
+resolve_agent_home_source
 HANDOFF_DIR="$AGENT_HOME/handoff"
 HOOKS_DIR="$AGENT_HOME/scripts/hooks"
 
@@ -43,6 +72,7 @@ echo "  Token Optimizer 状态检查"
 echo "========================================"
 echo ""
 echo "Agent Home: $AGENT_HOME"
+echo "Resolved By: $RESOLVED_AGENT_HOME_SOURCE"
 echo ""
 
 # Layer 1: Caveman

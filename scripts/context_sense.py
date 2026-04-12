@@ -26,18 +26,19 @@ from typing import Any, Dict
 def resolve_agent_home() -> Path:
     """
     是什么: Claude/Codex 通用目录解析函数。
-    做什么: 优先读取 AGENT_HOME/CODEX_HOME/CLAUDE_DIR，未设置时探测 ~/.codex，最后回退 ~/.claude。
-    为什么: 让同一脚本可复用于 Claude Code 与 Codex 环境。
+    做什么: 优先读取显式目录变量，再按当前运行时的 session 环境变量选择 ~/.claude 或 ~/.codex，无法判断时保守回退 ~/.claude。
+    为什么: 避免仅因 ~/.codex 存在就误判到 Codex，同时保留双运行时兼容。
     """
     env = os.environ
-    for key in ("AGENT_HOME", "CODEX_HOME", "CLAUDE_DIR"):
+    for key in ("AGENT_HOME", "CLAUDE_DIR", "CODEX_HOME"):
         value = env.get(key)
         if value:
             return Path(value).expanduser()
 
-    codex_dir = Path.home() / ".codex"
-    if codex_dir.exists():
-        return codex_dir
+    if env.get("CLAUDE_SESSION_ID"):
+        return Path.home() / ".claude"
+    if env.get("CODEX_SESSION_ID"):
+        return Path.home() / ".codex"
     return Path.home() / ".claude"
 
 
@@ -114,8 +115,8 @@ def parse_transcript_bytes(payload: Dict[str, Any]) -> int:
 def resolve_session_id(payload: Dict[str, Any]) -> str:
     return (
         str(payload.get("session_id") or payload.get("sessionId") or "").strip()
-        or os.environ.get("CODEX_SESSION_ID", "").strip()
         or os.environ.get("CLAUDE_SESSION_ID", "").strip()
+        or os.environ.get("CODEX_SESSION_ID", "").strip()
         or "global"
     )
 
